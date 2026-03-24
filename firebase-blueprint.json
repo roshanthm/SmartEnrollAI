@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "students": {
+      "title": "Student",
+      "description": "Student profile and academic progress",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "major": { "type": "string" },
+        "creditsCompleted": { "type": "number" },
+        "gpa": { "type": "number" },
+        "enrolledCourses": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "courses": {
+      "title": "Course",
+      "description": "Course catalog information",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "e.g., CS101" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "credits": { "type": "number" },
+        "faculty": { "type": "string" },
+        "rating": { "type": "number" },
+        "difficulty": { "type": "number" },
+        "capacity": { "type": "number" },
+        "enrolledCount": { "type": "number" },
+        "prerequisites": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["code", "title", "credits", "capacity"]
+    },
+    "instructors": {
+      "title": "Instructor",
+      "description": "Faculty member details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "department": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["name", "email"]
+    },
+    "schedules": {
+      "title": "Schedule",
+      "description": "Course timing and location",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "day": { "type": "string", "enum": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
+        "startTime": { "type": "string", "description": "HH:MM" },
+        "endTime": { "type": "string", "description": "HH:MM" },
+        "location": { "type": "string" }
+      },
+      "required": ["courseId", "day", "startTime", "endTime"]
+    },
+    "registrations": {
+      "title": "Registration",
+      "description": "Student course enrollment record",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["enrolled", "waitlisted", "dropped"] }
+      },
+      "required": ["studentId", "courseId", "status"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": { "schema": "students", "description": "Student profiles" },
+    "/courses/{courseId}": { "schema": "courses", "description": "Course catalog" },
+    "/instructors/{instructorId}": { "schema": "instructors", "description": "Faculty list" },
+    "/courses/{courseId}/schedules/{scheduleId}": { "schema": "schedules", "description": "Timing for courses" },
+    "/registrations/{registrationId}": { "schema": "registrations", "description": "Enrollment records" }
+  }
+}

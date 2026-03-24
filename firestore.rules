@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: students
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - name: string (required) - Full name
+    //   - email: string (required) - Email address
+    //   - major: string (required) - Academic major
+    //   - creditsCompleted: number (required) - Total credits
+    //   - gpa: number (required) - Grade Point Average
+    //   - enrolledCourses: list (required) - Array of course IDs
+    //
+    // Collection: courses
+    // Document ID: {courseId}
+    // Fields:
+    //   - code: string (required) - e.g., CS101
+    //   - title: string (required) - Course name
+    //   - description: string (optional) - Course details
+    //   - credits: number (required) - Credit hours
+    //   - faculty: string (required) - Department
+    //   - rating: number (required) - Student rating
+    //   - difficulty: number (required) - Difficulty level
+    //   - capacity: number (required) - Max students
+    //   - enrolledCount: number (required) - Current students
+    //   - prerequisites: list (required) - Array of course codes
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "roshanpattathilsep16@gmail.com" && request.auth.token.email_verified == true)
+        );
+    }
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Domain Validators
+    function isValidStudent(data) {
+      let requiredFields = ['uid', 'name', 'email', 'major', 'creditsCompleted', 'gpa', 'enrolledCourses'];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, requiredFields) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.major is string &&
+             data.creditsCompleted is number && data.creditsCompleted >= 0 &&
+             data.gpa is number && data.gpa >= 0 && data.gpa <= 4.0 &&
+             data.enrolledCourses is list;
+    }
+
+    function isValidCourse(data) {
+      let requiredFields = ['code', 'title', 'description', 'credits', 'faculty', 'rating', 'difficulty', 'capacity', 'enrolledCount', 'prerequisites'];
+      return hasRequiredFields(data, requiredFields) &&
+             hasOnlyAllowedFields(data, requiredFields) &&
+             data.code is string && data.code.size() > 0 &&
+             data.title is string && data.title.size() > 0 &&
+             data.credits is number && data.credits > 0 &&
+             data.capacity is number && data.capacity > 0 &&
+             data.enrolledCount is number && data.enrolledCount >= 0 &&
+             data.rating is number &&
+             data.difficulty is number &&
+             data.prerequisites is list;
+    }
+
+    function isValidCourseEnrollmentUpdate() {
+      // Allow only enrolledCount to change by 1
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledCount']) &&
+             math.abs(request.resource.data.enrolledCount - resource.data.enrolledCount) == 1 &&
+             request.resource.data.enrolledCount <= resource.data.capacity;
+    }
+
+    // Rules
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(studentId) && isValidStudent(request.resource.data);
+      allow update: if isOwner(studentId) && isValidStudent(request.resource.data);
+    }
+
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidCourse(request.resource.data);
+      allow update: if isAdmin() || (isAuthenticated() && isValidCourseEnrollmentUpdate());
+      allow delete: if isAdmin();
+      
+      match /schedules/{scheduleId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /instructors/{instructorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /registrations/{registrationId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.studentId || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
